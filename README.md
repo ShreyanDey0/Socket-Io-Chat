@@ -1,4 +1,4 @@
-Step 1 : Create a database with name chatapp.
+Step 1 : Create a database with name chatapp. <br>
 Step 2 : Import the sql file.
 Step 3 : Run npm i
 Step 4 : Run npm start
