@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css">
+  </head>
+
+  <body>
+    <div class="mx-4 mt-2 py-2 px-4 border border-info rounded bg-primary d-flex justify-content-between">
+      <h3 class="text-center">Chat By Shreyan</h3>
+      <button class="btn btn-dark" id="disconnect">Leave Room</button>
+    </div>
+    <div class="d-flex w-100 py-3 px-4">
+      <div class="col-3 border rounded mr-1 p-0" style="max-height: 300px;">
+        <h5 class="text-center rounded bg-secondary p-2 m-2">Users</h5>
+        <ul class="ul">
+
+        </ul>
+      </div>
+      <div class="w-100 border rounded p-2" style="max-height: 550px;">
+        <div class="alert alert-info alert-dismissible fade show" style="display: none;" role="alert">
+          <div id="notice_text"></div>
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="alert alert-warning alert-dismissible fade show" style="display: none;" role="alert">
+          <div id="notice_text_warning"></div>
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <ul id="messages" style="max-height: 78%; overflow-y: scroll;" class="list-group"></ul>
+        <form id="form" action="" class="mt-2">
+          <div id="typingStatus"></div>
+          <div class="d-flex">
+            <input class="form-control w-100" required id="m" placeholder="Type your message here..."
+              autocomplete="off" />
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"></script>
+    <script>
+
+      $(function () {
+
+        $(".close").click(function () {
+          $("#messages").css({ "max-height": "91%", "overflow-y": "scroll" })
+        })
+
+        const params = new Proxy(new URLSearchParams(window.location.search), {
+          get: (searchParams, prop) => searchParams.get(prop),
+        });
+
+        let username = params.username;
+        let room = params.key
+
+        let is_changed_username = params.changed;
+
+        // console.log(username,room);
+
+        if (username == null || room == null || username == '' || room == '') {
+          window.location.href = "http://localhost:3000";
+        } else {
+
+          var socket = io();
+
+          socket.emit("joinRoom", ({ username, room }));
+
+          socket.on("userName", (new_username) => {
+            // console.log(new_username);
+
+            if (username != new_username)
+              window.location.href = `http://localhost:3000/chat?username=${new_username}&key=12345&changed=yes`;
+          })
+
+          if (is_changed_username != null || is_changed_username != '') {
+            socket.emit("userNameChanged", (is_changed_username));
+          } else {
+            socket.emit("userNameChanged", ("No"));
+          }
+
+          $.ajax({
+            method: "GET",
+            url: `http://localhost:3000/room/chats/${room}`,
+            success: function (res) {
+              if (res.data.length > 0) {
+
+                res.data.forEach((ele) => {
+
+
+                  const msg_time = new Date(ele.created_at);
+                  const today = new Date();
+
+                  let delivery_time = msg_time.toLocaleString();
+
+                  if (msg_time.setHours(0, 0, 0, 0) == today.setHours(0, 0, 0, 0)) {
+                    delivery_time = ele.message_time;
+                  }
+
+                  if (ele.user_name == username) {
+                    $('#messages').append("<li class='text-right list-group-item list-group-item-dark my-1' style='line-height: 20px;'> <small><b>" + "Me" + ", " + delivery_time + "</b></small><br>" + ele.user_message + "</li>");
+                  } else {
+                    $('#messages').append("<li class='list-group-item list-group-item-success my-1' style='line-height: 20px;'> <small><b>" + ele.user_name + ", " + delivery_time + "</b></small><br>" + ele.user_message + "</li>");
+                  }
+                })
+
+                $("#messages").animate({ scrollTop: $('#messages').prop("scrollHeight") }, 500);
+
+              }
+            }
+          })
+
+          // Submit message form
+          $('form').submit(function () {
+            socket.emit('chatMessage', JSON.stringify({ "message": $('#m').val(), "username": username, "room": room }));
+            $('#m').val('');
+            return false;
+          });
+
+          // Receive and display messages
+          socket.on('message', function (msg) {
+            // console.log(JSON.parse(msg));
+            parsedmsg = JSON.parse(msg);
+
+            if (parsedmsg.username == "notice") {
+              $("#notice_text").html(parsedmsg.message);
+              $(".alert-info").show();
+            } else if (parsedmsg.username == "notice_warning") {
+              $("#notice_text_warning").html(parsedmsg.message);
+              $(".alert-warning").show();
+            }
+            else if (parsedmsg.username == 'Me') {
+              $('#messages').append("<li class='text-right list-group-item list-group-item-dark my-1' style='line-height: 20px;'> <small><b>" + parsedmsg.username + ", " + parsedmsg.time + "</b></small><br>" + parsedmsg.message + "</li>");
+            } else {
+              $('#messages').append("<li class='list-group-item list-group-item-success my-1' style='line-height: 20px;'> <small><b>" + parsedmsg.username + ", " + parsedmsg.time + "</b></small><br>" + parsedmsg.message + "</li>");
+            }
+
+            $("#messages").animate({ scrollTop: $('#messages').prop("scrollHeight") }, 500);
+
+          });
+
+          $("#m").keypress((e) => {
+            if (e.which != 13) {
+              socket.emit("isTyping", ({ username, room }));
+            } else {
+              socket.emit("isNotTyping", ({ room }));
+            }
+          })
+
+          socket.on("typingStatus", (msg) => {
+            $('#typingStatus').html("<p style='font-size:8px; color: gray; line-height: 15px; margin: 0px;'>" + msg + "</p>")
+          })
+
+          socket.on("room_users_count", function (data) {
+            $(".ul").html('');
+            data.forEach(element => {
+              $(".ul").append("<li>" + element.user + "</li>");
+            });
+          })
+
+          $("#disconnect").click(function () {
+            socket.disconnect();
+            window.location.href = "http://localhost:3000";
+          })
+        }
+      });
+    </script>
+
+  </body>
+
+</html>

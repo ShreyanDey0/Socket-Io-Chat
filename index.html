@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Chat App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    
+    <h3>Rooms Present (Click on the room id to select a room)</h3>
+    <ul id="rooms"></ul>
+    <h4>OR Create a new room</h4>
+    
+    <form action="chat">
+      <input type="text" required placeholder="Username..." name="username">
+      <input type="text" placeholder="Room id..." name="key">
+      <button>Start</button>
+    </form>
+    
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script>
+      $.ajax({
+        type: "GET",
+        url: "http://localhost:3000/rooms",
+        success: function(res){
+          if(res.data.length > 0){
+            res.data.forEach(element => {
+              $("#rooms").append('<li onclick="setRoom(`'+element.room_id+'`)">'+ (element.room_name != null ? element.room_name : element.room_id) +'</li>')
+            });         
+          }else{
+            $("#rooms").append('<li>Sorry no room present, create a new room!</li>')
+          }
+        }
+      })
+
+      function setRoom(room_id){
+        $("input[name='key']").val(room_id);
+      }
+    </script>
+  </body>
+</html>
